@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-telegram-topics"
+version = "0.1.0"
+description = "Model Context Protocol (MCP) server for Telegram Supergroup Forum Topics"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "Fajar Indra Pradipta Gajah", email = "diptapradipta21@gmail.com" }
+]
+keywords = ["mcp", "claude", "telegram", "anthropic", "model-context-protocol", "forum-topics"]
+dependencies = [
+    "mcp>=2.0.0",
+]
+
+[project.scripts]
+mcp-telegram-topics = "server:app.run"
