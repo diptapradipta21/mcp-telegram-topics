@@ -31,6 +31,9 @@ This MCP server gives Claude **native tools** to:
 | `edit_forum_topic`  | `thread_id`, `name`, `icon_custom_emoji_id` | Renames a topic or updates its icon. |
 | `close_forum_topic` | `thread_id` | Marks a topic as closed/archived. |
 | `reopen_forum_topic`| `thread_id` | Reopens a closed forum topic. |
+| `delete_forum_topic`| `thread_id` | Permanently deletes a topic and all its messages. |
+| `pin_topic_message` | `thread_id`, `message_id`, `disable_notification` | Pins a key message inside a topic thread. |
+| `unpin_all_topic_messages` | `thread_id` | Clears all pinned messages inside a topic thread. |
 | `list_registered_topics` | *none* | Returns human-readable mapping from `TELEGRAM_TOPIC_MAP`. |
 
 ---

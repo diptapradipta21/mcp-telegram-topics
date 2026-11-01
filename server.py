@@ -142,6 +142,55 @@ def reopen_forum_topic(thread_id: int) -> str:
     return f"Failed to reopen topic: {res.get('error', 'Unknown error')}"
 
 @app.tool()
+def delete_forum_topic(thread_id: int) -> str:
+    """
+    Permanently delete a forum topic and all its messages.
+    
+    Args:
+        thread_id: The target forum topic message_thread_id to delete.
+    """
+    _, chat_id = get_config()
+    res = make_telegram_request("deleteForumTopic", {"chat_id": chat_id, "message_thread_id": thread_id})
+    if res.get("ok"):
+        return f"Topic thread {thread_id} permanently deleted."
+    return f"Failed to delete topic: {res.get('error', 'Unknown error')}"
+
+@app.tool()
+def pin_topic_message(thread_id: int, message_id: int, disable_notification: bool = False) -> str:
+    """
+    Pin a key message within a forum topic thread.
+    
+    Args:
+        thread_id: The forum topic message_thread_id.
+        message_id: The message ID to pin.
+        disable_notification: If True, pin silently without notifying members.
+    """
+    _, chat_id = get_config()
+    payload = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "disable_notification": disable_notification
+    }
+    res = make_telegram_request("pinChatMessage", payload)
+    if res.get("ok"):
+        return f"Message {message_id} successfully pinned in topic thread {thread_id}."
+    return f"Failed to pin message: {res.get('error', 'Unknown error')}"
+
+@app.tool()
+def unpin_all_topic_messages(thread_id: int) -> str:
+    """
+    Clear and unpin all pinned messages inside a forum topic.
+    
+    Args:
+        thread_id: The forum topic message_thread_id.
+    """
+    _, chat_id = get_config()
+    res = make_telegram_request("unpinAllForumTopicMessages", {"chat_id": chat_id, "message_thread_id": thread_id})
+    if res.get("ok"):
+        return f"All messages unpinned in topic thread {thread_id}."
+    return f"Failed to unpin messages: {res.get('error', 'Unknown error')}"
+
+@app.tool()
 def list_registered_topics() -> str:
     """
     List known topic mappings from TELEGRAM_TOPIC_MAP environment variable (if configured).
