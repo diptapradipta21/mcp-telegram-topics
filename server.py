@@ -10,10 +10,24 @@ import json
 import urllib.request
 import urllib.error
 from typing import Optional
-from mcp.server.mcpserver import MCPServer
+try:
+    from mcp.server.mcpserver import MCPServer
+    app = MCPServer("telegram-topics-mcp")
+except ImportError:
+    class DummyMCPServer:
+        """Fallback lightweight mock when mcp package is not installed."""
+        def __init__(self, name: str = ""):
+            self.name = name
 
-# Initialize MCP Server
-app = MCPServer("telegram-topics-mcp")
+        def tool(self):
+            def decorator(fn):
+                return fn
+            return decorator
+
+        def run(self, **kwargs):
+            raise RuntimeError("mcp package is not installed. Install with 'pip install mcp'.")
+
+    app = DummyMCPServer("telegram-topics-mcp")
 
 def get_config():
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -196,7 +210,9 @@ def list_registered_topics() -> str:
     List known topic mappings from TELEGRAM_TOPIC_MAP environment variable (if configured).
     Helpful for Claude to route messages by division name rather than raw ID.
     """
-    topic_map_raw = os.environ.get("TELEGRAM_TOPIC_MAP", "{}")
+    topic_map_raw = os.environ.get("TELEGRAM_TOPIC_MAP", "").strip()
+    if not topic_map_raw or topic_map_raw == "{}":
+        return "No predefined topic mappings configured in TELEGRAM_TOPIC_MAP. Use integer thread_ids directly."
     try:
         mapping = json.loads(topic_map_raw)
         if not mapping:
