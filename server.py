@@ -8,21 +8,20 @@ import os
 import json
 import urllib.request
 import urllib.error
-from typing import Optional, TYPE_CHECKING
+from typing import Any, Optional
 
 try:
     from mcp.server.mcpserver import MCPServer
     from mcp.types import ToolAnnotations
-    app = MCPServer("telegram-topics-mcp")
+    app: Any = MCPServer("telegram-topics-mcp")
 except ImportError:
-    if not TYPE_CHECKING:
-        class _DummyToolAnnotations:
-            """Fallback lightweight mock when mcp package is not installed."""
-            def __init__(self, **kwargs):
-                for k, v in kwargs.items():
-                    setattr(self, k, v)
+    class _DummyToolAnnotations:
+        """Fallback lightweight mock when mcp package is not installed."""
+        def __init__(self, **kwargs):
+            for k, v in kwargs.items():
+                setattr(self, k, v)
 
-        ToolAnnotations = _DummyToolAnnotations
+    ToolAnnotations = _DummyToolAnnotations  # type: ignore[misc,assignment]
 
     class _DummyMCPServer:
         """Fallback lightweight mock when mcp package is not installed."""
@@ -37,7 +36,7 @@ except ImportError:
         def run(self, **kwargs):
             raise RuntimeError("mcp package is not installed. Install with 'pip install mcp'.")
 
-    app = _DummyMCPServer("telegram-topics-mcp")  # type: ignore[assignment]
+    app = _DummyMCPServer("telegram-topics-mcp")
 
 
 def get_config():
