@@ -5,21 +5,31 @@ Enables Claude Desktop, Claude Code, and Anthropic AI agents to create, route, a
 """
 
 import os
-import sys
 import json
 import urllib.request
 import urllib.error
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
 try:
     from mcp.server.mcpserver import MCPServer
+    from mcp.types import ToolAnnotations
     app = MCPServer("telegram-topics-mcp")
 except ImportError:
-    class DummyMCPServer:
+    if not TYPE_CHECKING:
+        class _DummyToolAnnotations:
+            """Fallback lightweight mock when mcp package is not installed."""
+            def __init__(self, **kwargs):
+                for k, v in kwargs.items():
+                    setattr(self, k, v)
+
+        ToolAnnotations = _DummyToolAnnotations
+
+    class _DummyMCPServer:
         """Fallback lightweight mock when mcp package is not installed."""
         def __init__(self, name: str = ""):
             self.name = name
 
-        def tool(self):
+        def tool(self, *args, **kwargs):
             def decorator(fn):
                 return fn
             return decorator
@@ -27,7 +37,8 @@ except ImportError:
         def run(self, **kwargs):
             raise RuntimeError("mcp package is not installed. Install with 'pip install mcp'.")
 
-    app = DummyMCPServer("telegram-topics-mcp")
+    app = _DummyMCPServer("telegram-topics-mcp")  # type: ignore[assignment]
+
 
 def get_config():
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -35,6 +46,7 @@ def get_config():
     if not bot_token or not chat_id:
         raise ValueError("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID environment variables.")
     return bot_token, chat_id
+
 
 def make_telegram_request(endpoint: str, payload: dict) -> dict:
     bot_token, _ = get_config()
@@ -54,11 +66,19 @@ def make_telegram_request(endpoint: str, payload: dict) -> dict:
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
-@app.tool()
+
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=False,
+        open_world_hint=True,
+    )
+)
 def send_topic_message(thread_id: int, message: str, parse_mode: str = "Markdown") -> str:
     """
     Send a message or notification to a specific Telegram forum topic thread.
-    
+
     Args:
         thread_id: The target forum topic message_thread_id.
         message: The text content to post (supports Markdown formatting).
@@ -79,11 +99,19 @@ def send_topic_message(thread_id: int, message: str, parse_mode: str = "Markdown
         return f"Successfully sent message (ID: {msg_id}) to topic thread {thread_id}."
     return f"Failed to send message: {res.get('error', 'Unknown error')}"
 
-@app.tool()
+
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=False,
+        open_world_hint=True,
+    )
+)
 def create_forum_topic(name: str, icon_color: int = 7322096, icon_custom_emoji_id: Optional[str] = None) -> str:
     """
     Create a new forum topic in the configured Telegram Supergroup.
-    
+
     Args:
         name: Name/Title of the topic (1 to 128 characters).
         icon_color: Decimal RGB color code for topic icon (default 7322096 / light blue).
@@ -105,11 +133,19 @@ def create_forum_topic(name: str, icon_color: int = 7322096, icon_custom_emoji_i
         return f"Created topic '{name}' with thread ID {thread_id}."
     return f"Failed to create topic: {res.get('error', 'Unknown error')}"
 
-@app.tool()
+
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    )
+)
 def edit_forum_topic(thread_id: int, name: Optional[str] = None, icon_custom_emoji_id: Optional[str] = None) -> str:
     """
     Rename an existing forum topic or change its icon.
-    
+
     Args:
         thread_id: The target forum topic message_thread_id.
         name: New title for the topic.
@@ -127,11 +163,19 @@ def edit_forum_topic(thread_id: int, name: Optional[str] = None, icon_custom_emo
         return f"Topic thread {thread_id} updated successfully."
     return f"Failed to edit topic: {res.get('error', 'Unknown error')}"
 
-@app.tool()
+
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    )
+)
 def close_forum_topic(thread_id: int) -> str:
     """
     Close an active forum topic (marks it as completed/archived).
-    
+
     Args:
         thread_id: The target forum topic message_thread_id.
     """
@@ -141,11 +185,19 @@ def close_forum_topic(thread_id: int) -> str:
         return f"Topic thread {thread_id} closed."
     return f"Failed to close topic: {res.get('error', 'Unknown error')}"
 
-@app.tool()
+
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    )
+)
 def reopen_forum_topic(thread_id: int) -> str:
     """
     Reopen a previously closed forum topic.
-    
+
     Args:
         thread_id: The target forum topic message_thread_id.
     """
@@ -155,11 +207,19 @@ def reopen_forum_topic(thread_id: int) -> str:
         return f"Topic thread {thread_id} reopened."
     return f"Failed to reopen topic: {res.get('error', 'Unknown error')}"
 
-@app.tool()
+
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=True,
+        open_world_hint=True,
+    )
+)
 def delete_forum_topic(thread_id: int) -> str:
     """
     Permanently delete a forum topic and all its messages.
-    
+
     Args:
         thread_id: The target forum topic message_thread_id to delete.
     """
@@ -169,11 +229,19 @@ def delete_forum_topic(thread_id: int) -> str:
         return f"Topic thread {thread_id} permanently deleted."
     return f"Failed to delete topic: {res.get('error', 'Unknown error')}"
 
-@app.tool()
+
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    )
+)
 def pin_topic_message(thread_id: int, message_id: int, disable_notification: bool = False) -> str:
     """
     Pin a key message within a forum topic thread.
-    
+
     Args:
         thread_id: The forum topic message_thread_id.
         message_id: The message ID to pin.
@@ -190,11 +258,19 @@ def pin_topic_message(thread_id: int, message_id: int, disable_notification: boo
         return f"Message {message_id} successfully pinned in topic thread {thread_id}."
     return f"Failed to pin message: {res.get('error', 'Unknown error')}"
 
-@app.tool()
+
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=True,
+        open_world_hint=True,
+    )
+)
 def unpin_all_topic_messages(thread_id: int) -> str:
     """
     Clear and unpin all pinned messages inside a forum topic.
-    
+
     Args:
         thread_id: The forum topic message_thread_id.
     """
@@ -204,7 +280,15 @@ def unpin_all_topic_messages(thread_id: int) -> str:
         return f"All messages unpinned in topic thread {thread_id}."
     return f"Failed to unpin messages: {res.get('error', 'Unknown error')}"
 
-@app.tool()
+
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def list_registered_topics() -> str:
     """
     List known topic mappings from TELEGRAM_TOPIC_MAP environment variable (if configured).
@@ -221,6 +305,7 @@ def list_registered_topics() -> str:
         return "Registered Topic Routing:\n" + "\n".join(formatted)
     except Exception as e:
         return f"Error parsing TELEGRAM_TOPIC_MAP: {e}"
+
 
 if __name__ == "__main__":
     app.run(transport="stdio")

@@ -87,6 +87,16 @@ class TestTelegramTopicsMCP(unittest.TestCase):
         unpin_res = server.unpin_all_topic_messages(42)
         self.assertIn("All messages unpinned in topic thread 42", unpin_res)
 
+    @patch("urllib.request.urlopen")
+    def test_edit_forum_topic(self, mock_urlopen):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps({"ok": True, "result": True}).encode("utf-8")
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        res = server.edit_forum_topic(42, name="Renamed Topic")
+        self.assertIn("Topic thread 42 updated successfully", res)
+
     def test_list_registered_topics(self):
         with patch.dict("os.environ", {"TELEGRAM_TOPIC_MAP": json.dumps({"WarRoom": 141, "CBSI": 827})}):
             res = server.list_registered_topics()
@@ -96,6 +106,18 @@ class TestTelegramTopicsMCP(unittest.TestCase):
         with patch.dict("os.environ", {"TELEGRAM_TOPIC_MAP": ""}):
             res = server.list_registered_topics()
             self.assertIn("No predefined topic mappings", res)
+
+    def test_tool_annotations_declared(self):
+        if hasattr(server.app, "list_tools"):
+            import asyncio
+            tools = asyncio.run(server.app.list_tools())
+            self.assertEqual(len(tools), 9)
+            for t in tools:
+                ann = t.annotations
+                assert ann is not None, f"{t.name} missing annotations"
+                dumped = ann.model_dump(by_alias=True)
+                for hint in ("readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"):
+                    self.assertIsInstance(dumped.get(hint), bool, f"{t.name}.{hint} must be bool")
 
 if __name__ == "__main__":
     unittest.main()
