@@ -111,7 +111,7 @@ class TestTelegramTopicsMCP(unittest.TestCase):
         if hasattr(server.app, "list_tools"):
             import asyncio
             tools = asyncio.run(server.app.list_tools())
-            self.assertEqual(len(tools), 9)
+            self.assertEqual(len(tools), 10)
             for t in tools:
                 ann = t.annotations
                 assert ann is not None, f"{t.name} missing annotations"
@@ -119,5 +119,33 @@ class TestTelegramTopicsMCP(unittest.TestCase):
                 for hint in ("readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"):
                     self.assertIsInstance(dumped.get(hint), bool, f"{t.name}.{hint} must be bool")
 
+    @patch("urllib.request.urlopen")
+    def test_check_bot_health_success(self, mock_urlopen):
+        mock_me = MagicMock()
+        mock_me.read.return_value = json.dumps({"ok": True, "result": {"username": "HermesBot"}}).encode("utf-8")
+        mock_me.__enter__.return_value = mock_me
+
+        mock_chat = MagicMock()
+        mock_chat.read.return_value = json.dumps({"ok": True, "result": {"title": "HQ Group", "is_forum": True}}).encode("utf-8")
+        mock_chat.__enter__.return_value = mock_chat
+
+        mock_urlopen.side_effect = [mock_me, mock_chat]
+
+        res = server.check_bot_health()
+        self.assertIn("Bot Healthy: @HermesBot", res)
+        self.assertIn("HQ Group", res)
+        self.assertIn("Forum Enabled: True", res)
+
+    @patch("urllib.request.urlopen")
+    def test_check_bot_health_auth_failure(self, mock_urlopen):
+        mock_me = MagicMock()
+        mock_me.read.return_value = json.dumps({"ok": False, "error": "Unauthorized"}).encode("utf-8")
+        mock_me.__enter__.return_value = mock_me
+        mock_urlopen.return_value = mock_me
+
+        res = server.check_bot_health()
+        self.assertIn("Bot auth failure: Unauthorized", res)
+
 if __name__ == "__main__":
+
     unittest.main()

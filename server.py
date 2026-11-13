@@ -306,5 +306,81 @@ def list_registered_topics() -> str:
         return f"Error parsing TELEGRAM_TOPIC_MAP: {e}"
 
 
-if __name__ == "__main__":
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    )
+)
+def check_bot_health() -> str:
+    """
+    Verify Telegram Bot API authentication and Supergroup forum permissions.
+    """
+    bot_info = make_telegram_request("getMe", {})
+    if not bot_info.get("ok"):
+        return f"Bot auth failure: {bot_info.get('error', 'Unknown error')}"
+
+    bot_user = bot_info.get("result", {}).get("username", "unknown")
+
+    _, chat_id = get_config()
+    chat_info = make_telegram_request("getChat", {"chat_id": chat_id})
+    if not chat_info.get("ok"):
+        return f"Bot authenticated as @{bot_user}, but chat access failed: {chat_info.get('error', 'Unknown error')}"
+
+    chat = chat_info.get("result", {})
+    title = chat.get("title", str(chat_id))
+    is_forum = chat.get("is_forum", False)
+    return f"Bot Healthy: @{bot_user} connected to supergroup '{title}' (Chat ID: {chat_id}, Forum Enabled: {is_forum})."
+
+
+def main() -> None:
+    import argparse
+    import sys
+    parser = argparse.ArgumentParser(description="mcp-telegram-topics MCP Server & Diagnostic CLI")
+    parser.add_argument("--check", action="store_true", help="Verify bot token and target chat forum permissions")
+    parser.add_argument("--list-routes", action="store_true", help="Print mapped forum topics from TELEGRAM_TOPIC_MAP")
+    parser.add_argument("--send-test", type=int, metavar="THREAD_ID", help="Send a test message to the specified thread ID")
+    parser.add_argument("--json", action="store_true", help="Output machine-readable JSON for diagnostic checks")
+    args = parser.parse_args()
+
+    if args.check:
+        res = check_bot_health()
+        ok = res.startswith("Bot Healthy")
+        if args.json:
+            print(json.dumps({"ok": ok, "detail": res}, indent=2))
+        else:
+            print("[*] Checking Telegram Bot API and forum topic permissions...")
+            print(res)
+        sys.exit(0 if ok else 1)
+
+    if args.list_routes:
+        res = list_registered_topics()
+        if args.json:
+            topic_map_raw = os.environ.get("TELEGRAM_TOPIC_MAP", "{}").strip()
+            try:
+                mapping = json.loads(topic_map_raw)
+            except Exception:
+                mapping = {}
+            print(json.dumps({"registered_topics": mapping}, indent=2))
+        else:
+            print(res)
+        sys.exit(0)
+
+    if args.send_test is not None:
+        res = send_topic_message(args.send_test, "Ping from mcp-telegram-topics CLI diagnostic")
+        ok = res.startswith("Successfully sent message")
+        if args.json:
+            print(json.dumps({"ok": ok, "detail": res}, indent=2))
+        else:
+            print(f"[*] Sending test message to thread {args.send_test}...")
+            print(res)
+        sys.exit(0 if ok else 1)
+
     app.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()
+
