@@ -8,7 +8,50 @@ import os
 import json
 import urllib.request
 import urllib.error
-from typing import Any, Optional
+import logging
+import time
+from functools import wraps
+from typing import Any, Callable, Optional
+
+
+# Configure structured logging
+logger = logging.getLogger("telegram-topics-mcp")
+logger.setLevel(logging.DEBUG)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("[%(levelname)s] %(name)s: %(message)s"))
+    logger.addHandler(handler)
+
+
+class TelegramAPIError(Exception):
+    """Raised when Telegram API call fails."""
+    pass
+
+
+class ConfigError(Exception):
+    """Raised when environment config is invalid."""
+    pass
+
+
+def retry_on_transient_error(max_retries: int = 3, backoff_factor: float = 1.5) -> Callable:
+    """Decorator: retry on transient Telegram API errors."""
+    def decorator(fn: Callable) -> Callable:
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries):
+                try:
+                    return fn(*args, **kwargs)
+                except urllib.error.HTTPError as e:
+                    if e.code not in {429, 500, 503}:
+                        raise
+                    if attempt == max_retries - 1:
+                        raise
+                    wait_time = backoff_factor ** attempt
+                    logger.warning(f"Transient HTTP {e.code}, retry {attempt+1}/{max_retries} in {wait_time}s")
+                    time.sleep(wait_time)
+            return None
+        return wrapper
+    return decorator
 
 try:
     from mcp.server.mcpserver import MCPServer
@@ -39,31 +82,43 @@ except ImportError:
     app = _DummyMCPServer("telegram-topics-mcp")
 
 
-def get_config():
+def get_config() -> tuple[str, str]:
+    """Load Telegram config. Raises ConfigError if invalid."""
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     if not bot_token or not chat_id:
-        raise ValueError("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID environment variables.")
+        raise ConfigError("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID environment variables.")
+    logger.debug(f"Loaded Telegram config: chat_id={chat_id}")
     return bot_token, chat_id
 
 
-def make_telegram_request(endpoint: str, payload: dict) -> dict:
+@retry_on_transient_error(max_retries=3, backoff_factor=1.5)
+def make_telegram_request(endpoint: str, payload: dict) -> dict[str, Any]:
+    """Execute Telegram API request with retry on transient errors."""
     bot_token, _ = get_config()
     url = f"https://api.telegram.org/bot{bot_token}/{endpoint}"
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    logger.debug(f"Telegram API {endpoint}")
+    start = time.perf_counter()
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            result = json.loads(resp.read().decode("utf-8"))
+            elapsed = time.perf_counter() - start
+            logger.debug(f"Telegram API {endpoint} completed in {elapsed:.2f}s")
+            return result
     except urllib.error.HTTPError as e:
         err_msg = e.read().decode("utf-8")
         try:
             parsed = json.loads(err_msg)
-            return {"ok": False, "error": parsed.get("description", err_msg)}
+            error_detail = parsed.get("description", err_msg)
         except Exception:
-            return {"ok": False, "error": err_msg}
+            error_detail = err_msg
+        logger.error(f"Telegram API {endpoint} failed: {error_detail}")
+        raise TelegramAPIError(f"HTTP {e.code}: {error_detail}")
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        logger.error(f"Telegram API {endpoint} network error: {str(e)}")
+        raise TelegramAPIError(f"Network error: {str(e)}")
 
 
 @app.tool(
