@@ -25,9 +25,9 @@ class TestTelegramTopicsMCP(unittest.TestCase):
         self.assertEqual(token, "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11")
         self.assertEqual(chat_id, "-1001234567890")
 
-    def test_get_config_missing_raises_value_error(self):
+    def test_get_config_missing_raises_config_error(self):
         with patch.dict("os.environ", {}, clear=True):
-            with self.assertRaises(ValueError):
+            with self.assertRaises(server.ConfigError):
                 server.get_config()
 
     @patch("urllib.request.urlopen")
