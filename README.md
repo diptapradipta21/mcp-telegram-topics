@@ -4,6 +4,7 @@
 [![MCP Standard](https://img.shields.io/badge/MCP-2.0-orange.svg)](https://modelcontextprotocol.io/)
 [![Anthropic Claude](https://img.shields.io/badge/Claude-Desktop%20%26%20Code-purple.svg)](https://claude.ai/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![M8ven Score](https://m8ven.ai/badge/mcp/diptapradipta21-mcp-telegram-topics-1yd7n7?v=b8d4d7c80fc6b3d5175727d4ba87a5ec)](https://m8ven.ai/mcp/diptapradipta21-mcp-telegram-topics-1yd7n7?s=readme)
 
 > **Official Model Context Protocol (MCP) server that empowers Claude Desktop, Claude Code, and autonomous AI agents to seamlessly route alerts, create topics, and manage Telegram supergroup forum threads.**
 
